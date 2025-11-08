@@ -57,9 +57,8 @@ void DivPlatformBifurcator::acquire(short** buf, size_t len) {
     for (int i=0; i<4; i++) {
       chan[i].audSub+=chan[i].freq;
       if (chan[i].audSub>=65536) {
-        int64_t newx=(int64_t)chan[i].curx*(chan[i].param+65536)/32768;
-        newx*=65536-chan[i].curx;
-        chan[i].curx=(int)(newx/65536);
+        int64_t newx=(int64_t)chan[i].curx+(chan[i].param);
+        chan[i].curx=(int)(newx&65535);
         chan[i].audSub&=65535;
       }
       int out=chan[i].curx-32768;
