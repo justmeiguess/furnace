@@ -1,6 +1,6 @@
 /**
  * Furnace Tracker - multi-system chiptune tracker
- * Copyright (C) 2021-2025 tildearrow and contributors
+ * Copyright (C) 2021-2026 tildearrow and contributors
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -380,7 +380,7 @@ void FurnaceGUI::doDelete() {
         for (; j<e->curSubSong->patLen && (j<=selEnd.y || jOrder<selEnd.order); j++) {
           touch(jOrder,j);
           if (iFine==0) {
-            if (selStart.y==selEnd.y && selStart.order==selEnd.order) pat->newData[j][DIV_PAT_VOL]=-1;
+            if (selStart.y==selEnd.y && selStart.order==selEnd.order) pat->newData[j][DIV_PAT_INS]=-1;
           }
           pat->newData[j][iFine]=-1;
 
@@ -567,9 +567,9 @@ String FurnaceGUI::doCopy(bool cut, bool writeClipboard, const SelectionPoint& s
     for (; j<e->curSubSong->patLen && (j<=sEnd.y || jOrder<sEnd.order); j++) {
       int iCoarse=sStart.xCoarse;
       int iFine=sStart.xFine;
-      if (iFine>3 && !(iFine&1)) {
+      /*if (iFine>3 && !(iFine&1)) {
         iFine--;
-      }
+      }*/
       clipb+='\n';
       for (; iCoarse<=sEnd.xCoarse; iCoarse++) {
         if (!e->curSubSong->chanShow[iCoarse]) continue;
@@ -621,7 +621,7 @@ void FurnaceGUI::doPasteFurnace(PasteMode mode, int arg, bool readClipboard, Str
   for (size_t i=2; i<data.size() && j<e->curSubSong->patLen; i++) {
     size_t charPos=0;
     int iCoarse=cursor.xCoarse;
-    int iFine=(startOff>2 && cursor.xFine>2)?(((cursor.xFine-1)&(~1))|1):startOff;
+    int iFine=(startOff>2 && cursor.xFine>2)?(cursor.xFine /*((cursor.xFine-1)&(~1))|1*/):startOff;
 
     String& line=data[i];
 
@@ -1032,14 +1032,14 @@ void FurnaceGUI::doPasteMPT(PasteMode mode, int arg, bool readClipboard, String 
           if (!(mode==GUI_PASTE_MODE_MIX_BG || mode==GUI_PASTE_MODE_INS_BG) || (pat->newData[j][DIV_PAT_NOTE]==-1)) {
             if (!decodeNote(note,pat->newData[j][DIV_PAT_NOTE])) {
               if (strcmp(note, "^^^")==0) {
-                pat->newData[j][0]=DIV_NOTE_OFF;
+                pat->newData[j][DIV_PAT_NOTE]=DIV_NOTE_OFF;
               } else if (strcmp(note, "~~~")==0 || strcmp(note,"===")==0) {
-                pat->newData[j][0]=DIV_NOTE_REL;
+                pat->newData[j][DIV_PAT_NOTE]=DIV_NOTE_REL;
               } else {
                 invalidData=true;
+                break;
               }
-              break;
-            } else {
+            } else if (pat->newData[j][DIV_PAT_NOTE]<180) {
               // MPT is one octave higher...
               if (pat->newData[j][DIV_PAT_NOTE]<12) {
                 pat->newData[j][DIV_PAT_NOTE]=0;
@@ -1973,6 +1973,8 @@ void FurnaceGUI::doDrag(bool copy) {
 
 void FurnaceGUI::moveSelected(int x, int y) {
   SelectionPoint selStartOld, selEndOld, selStartNew, selEndNew;
+  finishSelection();
+
   selStartOld=selStart;
   selEndOld=selEnd;
 

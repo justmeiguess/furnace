@@ -1,6 +1,6 @@
 /**
  * Furnace Tracker - multi-system chiptune tracker
- * Copyright (C) 2021-2025 tildearrow and contributors
+ * Copyright (C) 2021-2026 tildearrow and contributors
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -217,13 +217,13 @@ void DivPlatformTIA::tick(bool sysTick) {
     }
     if (chan[i].freqChanged || chan[i].keyOn || chan[i].keyOff) {
       if (chan[i].fixedArp) {
-        chan[i].freq=chan[i].baseNoteOverride&31;
+        chan[i].freq=(chan[i].baseNoteOverride-60)&31;
         chan[i].tuneFreq=0;
         if (!skipRegisterWrites && dumpWrites) {
           addWrite(0xfffe0000+i,chan[i].freq*256);
         }
       } else if (oldPitch) {
-        int bf=chan[i].baseFreq;
+        int bf=chan[i].baseFreq-0x3c00;
         if (!chan[i].fixedArp) {
           bf+=chan[i].arpOff<<8;
         }
@@ -242,7 +242,7 @@ void DivPlatformTIA::tick(bool sysTick) {
         if (chan[i].freq>31) chan[i].freq=31;
         chan[i].tuneFreq=0;
       } else {
-        int bf=chan[i].baseFreq+(chan[i].arpOff<<8);
+        int bf=chan[i].baseFreq+(chan[i].arpOff<<8)-0x3c00;
         int shape=chan[i].shape;
         if (shape==4 || shape==5) {
           if (bf<40*256) {
@@ -295,7 +295,7 @@ int DivPlatformTIA::dispatch(DivCommand c) {
       chan[c.chan].keyOn=true;
       rWrite(0x15+c.chan,chan[c.chan].shape);
       chan[c.chan].macroInit(ins);
-      if (!parent->song.brokenOutVol && !chan[c.chan].std.vol.will) {
+      if (!parent->song.compatFlags.brokenOutVol && !chan[c.chan].std.vol.will) {
         chan[c.chan].outVol=chan[c.chan].vol;
       }
       if (chan[c.chan].insChanged) {
@@ -395,7 +395,7 @@ int DivPlatformTIA::dispatch(DivCommand c) {
       break;
     case DIV_CMD_PRE_PORTA:
       if (chan[c.chan].active && c.value2) {
-        if (parent->song.resetMacroOnPorta) chan[c.chan].macroInit(parent->getIns(chan[c.chan].ins,DIV_INS_TIA));
+        if (parent->song.compatFlags.resetMacroOnPorta) chan[c.chan].macroInit(parent->getIns(chan[c.chan].ins,DIV_INS_TIA));
       }
       chan[c.chan].inPorta=c.value;
       break;
@@ -432,7 +432,7 @@ void DivPlatformTIA::forceIns() {
   }
 }
 
-void* DivPlatformTIA::getChanState(int ch) {
+SharedChannel* DivPlatformTIA::getChanState(int ch) {
   return &chan[ch];
 }
 
@@ -459,7 +459,7 @@ void DivPlatformTIA::reset() {
   tia.reset(mixingType);
   memset(regPool,0,16);
   for (int i=0; i<2; i++) {
-    chan[i]=DivPlatformTIA::Channel();
+    chan[i]=DivPlatformTIA::Channel(parent->song.compatFlags.linearPitch);
     chan[i].std.setEngine(parent);
     chan[i].vol=0x0f;
   }

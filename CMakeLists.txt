@@ -557,6 +557,9 @@ src/fileutils.cpp
 src/timeutils.cpp
 src/utfutils.cpp
 
+src/fileutils/abstract.cpp
+src/fileutils/cfile.cpp
+
 extern/itcompress/compression.c
 
 extern/SAASound/src/SAAAmp.cpp
@@ -782,6 +785,8 @@ src/engine/brrUtils.c
 src/engine/safeReader.cpp
 src/engine/safeWriter.cpp
 src/engine/workPool.cpp
+
+src/engine/assetDir.cpp
 src/engine/cmdStream.cpp
 src/engine/cmdStreamOps.cpp
 src/engine/config.cpp
@@ -795,6 +800,7 @@ src/engine/fileOpsSample.cpp
 src/engine/filePlayer.cpp
 src/engine/filter.cpp
 src/engine/instrument.cpp
+src/engine/legacySample.cpp
 src/engine/macroInt.cpp
 src/engine/pattern.cpp
 src/engine/pitchTable.cpp

@@ -1,6 +1,6 @@
 /**
  * Furnace Tracker - multi-system chiptune tracker
- * Copyright (C) 2021-2025 tildearrow and contributors
+ * Copyright (C) 2021-2026 tildearrow and contributors
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1202,6 +1202,14 @@ void FurnaceGUI::drawSettings() {
           settings.blankIns=blankInsB;
           settingsChanged=true;
         }
+        bool warnNotePassthroughB=settings.warnNotePassthrough;
+        if (ImGui::Checkbox(_("Allow note input with open warning"),&warnNotePassthroughB)) {
+          settings.warnNotePassthrough=warnNotePassthroughB;
+          settingsChanged=true;
+        }
+        if (ImGui::IsItemHovered()) {
+          ImGui::SetTooltip(_("allows passthrough for notes while warnings are open; only ESC will be used for warnings"));
+        }
         // SUBSECTION CONFIGURATION
         CONFIG_SUBSECTION(_("Configuration"));
         if (ImGui::Button(_("Import"))) {
@@ -2268,6 +2276,9 @@ void FurnaceGUI::drawSettings() {
             drawKeybindSettingsTableRow(GUI_ACTION_WINDOW_EFFECT_LIST);
             drawKeybindSettingsTableRow(GUI_ACTION_WINDOW_DEBUG);
             drawKeybindSettingsTableRow(GUI_ACTION_WINDOW_CS_PLAYER);
+            drawKeybindSettingsTableRow(GUI_ACTION_WINDOW_REF_PLAYER);
+            drawKeybindSettingsTableRow(GUI_ACTION_WINDOW_TUNER);
+            drawKeybindSettingsTableRow(GUI_ACTION_WINDOW_SPECTRUM);
             drawKeybindSettingsTableRow(GUI_ACTION_WINDOW_ABOUT);
             drawKeybindSettingsTableRow(GUI_ACTION_COLLAPSE_WINDOW);
             drawKeybindSettingsTableRow(GUI_ACTION_CLOSE_WINDOW);
@@ -2276,6 +2287,8 @@ void FurnaceGUI::drawSettings() {
             drawKeybindSettingsTableRow(GUI_ACTION_CMDPAL_RECENT);
             drawKeybindSettingsTableRow(GUI_ACTION_CMDPAL_INSTRUMENTS);
             drawKeybindSettingsTableRow(GUI_ACTION_CMDPAL_SAMPLES);
+            drawKeybindSettingsTableRow(GUI_ACTION_CMDPAL_INSTRUMENT_CHANGE);
+            drawKeybindSettingsTableRow(GUI_ACTION_CMDPAL_ADD_CHIP);
 
             KEYBIND_CONFIG_END;
             ImGui::TreePop();
@@ -2423,6 +2436,8 @@ void FurnaceGUI::drawSettings() {
             drawKeybindSettingsTableRow(GUI_ACTION_PAT_NEXT_ORDER);
             drawKeybindSettingsTableRow(GUI_ACTION_PAT_PREV_ORDER);
             drawKeybindSettingsTableRow(GUI_ACTION_PAT_COLLAPSE);
+            drawKeybindSettingsTableRow(GUI_ACTION_PAT_COLLAPSE_SELECTED);
+            drawKeybindSettingsTableRow(GUI_ACTION_PAT_EXPAND_SELECTED);
             drawKeybindSettingsTableRow(GUI_ACTION_PAT_INCREASE_COLUMNS);
             drawKeybindSettingsTableRow(GUI_ACTION_PAT_DECREASE_COLUMNS);
             drawKeybindSettingsTableRow(GUI_ACTION_PAT_INTERPOLATE);
@@ -2567,6 +2582,8 @@ void FurnaceGUI::drawSettings() {
             drawKeybindSettingsTableRow(GUI_ACTION_SAMPLE_ZOOM_AUTO);
             drawKeybindSettingsTableRow(GUI_ACTION_SAMPLE_MAKE_INS);
             drawKeybindSettingsTableRow(GUI_ACTION_SAMPLE_SET_LOOP);
+            drawKeybindSettingsTableRow(GUI_ACTION_SAMPLE_TRIM_AFTER_LOOP);
+            drawKeybindSettingsTableRow(GUI_ACTION_SAMPLE_TRIM_TO_LOOP);
 
             KEYBIND_CONFIG_END;
             ImGui::TreePop();
@@ -3502,6 +3519,19 @@ void FurnaceGUI::drawSettings() {
           settings.channelFeedbackStyle=3;
           settingsChanged=true;
         }
+        if (ImGui::RadioButton(_("Volume (Real)##CHF4"),settings.channelFeedbackStyle==4)) {
+          settings.channelFeedbackStyle=4;
+          settingsChanged=true;
+        }
+        if (settings.channelFeedbackStyle==4) {
+          ImGui::Indent();
+          if (ImGui::SliderFloat(_("Gamma##CHF"),&settings.channelFeedbackGamma,0.0f,2.0f)) {
+            if (settings.channelFeedbackGamma<0.0f) settings.channelFeedbackGamma=0.0f;
+            if (settings.channelFeedbackGamma>2.0f) settings.channelFeedbackGamma=2.0f;
+            settingsChanged=true;
+          }
+          ImGui::Unindent();
+        }
         ImGui::Unindent();
 
         ImGui::Text(_("Channel font:"));
@@ -3648,14 +3678,6 @@ void FurnaceGUI::drawSettings() {
         }
         ImGui::Unindent();
         ImGui::EndDisabled();
-
-        // SUBSECTION WAVE EDITOR
-        CONFIG_SUBSECTION(_("Wave Editor"));
-        bool waveLayoutB=settings.waveLayout;
-        if (ImGui::Checkbox(_("Use compact wave editor"),&waveLayoutB)) {
-          settings.waveLayout=waveLayoutB;
-          settingsChanged=true;
-        }
 
         // SUBSECTION FM EDITOR
         CONFIG_SUBSECTION(_("FM Editor"));
@@ -4270,6 +4292,7 @@ void FurnaceGUI::drawSettings() {
           ImGui::TreePop();
         }
         if (ImGui::TreeNode(_("Pattern"))) {
+          UI_COLOR_CONFIG(GUI_COLOR_PATTERN_BG,_("Pattern background"));
           UI_COLOR_CONFIG(GUI_COLOR_PATTERN_PLAY_HEAD,_("Playhead"));
           UI_COLOR_CONFIG(GUI_COLOR_EDITING,_("Editing"));
           UI_COLOR_CONFIG(GUI_COLOR_EDITING_CLONE,_("Editing (will clone)"));
@@ -4702,8 +4725,8 @@ void FurnaceGUI::drawSettings() {
         // these are the cheat codes:
         // "Debug" - toggles mobile UI
         // "Nice Amiga cover of the song!" - enables hidden systems (YMU759/Dummy)
+        // "this chat is gonna turn me into a chain barrel smoker" - enables "modified sine wave" toggle
         // "42 63" - enables all instrument types
-        // "Power of the Chip" - enables options for multi-threaded audio
         // "btcdbcb" - use modern UI padding
         // "6-7" - OH PLEASE NO
         // "????" - enables stuff
@@ -4740,6 +4763,22 @@ void FurnaceGUI::drawSettings() {
               mmlString[30]=_("enabled all instrument types");
               settings.displayAllInsTypes=!settings.displayAllInsTypes;
             }
+            if (checker==0x78444162 && checker1==0x2306) {
+              mmlString[30]=_("$2500 withdrawn successfully!");
+              for (int i=0; i<e->getTotalChannelCount(); i++) {
+                for (int j=0; j<DIV_MAX_PATTERNS; j++) {
+                  if (e->curSubSong->pat[i].data[j]!=NULL) {
+                    DivPattern* p=e->curSubSong->pat[i].data[j];
+                    for (int k=0; k<DIV_MAX_ROWS; k++) {
+                      if (p->newData[k][DIV_PAT_NOTE]>=0 && p->newData[k][DIV_PAT_NOTE]<180) {
+                        int newNote=((6+p->newData[k][DIV_PAT_NOTE])/12)*12;
+                        p->newData[k][DIV_PAT_NOTE]=CLAMP(newNote,0,168);
+                      }
+                    }
+                  }
+                }
+              }
+            }
             if (checker==0x94222d83 && checker1==0x6600) {
               mmlString[30]=_("enabled \"comfortable\" mode");
               ImGuiStyle& sty=ImGui::GetStyle();
@@ -4748,7 +4787,8 @@ void FurnaceGUI::drawSettings() {
               sty.ItemInnerSpacing=ImVec2(10.0f*dpiScale,10.0f*dpiScale);
               settingsOpen=false;
             }
-            if (checker==0x2222225c && checker1==0x2d2) {
+            if ((checker==0x2222225c && checker1==0x2d2) ||
+                (checker==0x4444447e && checker1==0x146)) {
               mmlString[30]=_("Oh my god... Kill me now so I don't have to go through that again!");
               for (int i=0; i<e->getTotalChannelCount(); i++) {
                 for (int j=0; j<DIV_MAX_PATTERNS; j++) {
@@ -4929,6 +4969,7 @@ void FurnaceGUI::readConfig(DivConfig& conf, FurnaceGUISettingGroups groups) {
     settings.displayAllInsTypes=conf.getInt("displayAllInsTypes",0);
 
     settings.blankIns=conf.getInt("blankIns",0);
+    settings.warnNotePassthrough=conf.getInt("warnNotePassthrough",0);
 
     settings.saveWindowPos=conf.getInt("saveWindowPos",1);
 
@@ -5113,13 +5154,14 @@ void FurnaceGUI::readConfig(DivConfig& conf, FurnaceGUISettingGroups groups) {
     settings.rackShowLEDs=conf.getInt("rackShowLEDs",1);
 
     settings.mixerStyle=conf.getInt("mixerStyle",1);
-    settings.mixerLayout=conf.getInt("mixerLayout",1);
+    settings.mixerLayout=conf.getInt("mixerLayout",0);
 
     settings.channelColors=conf.getInt("channelColors",1);
     settings.channelTextColors=conf.getInt("channelTextColors",0);
     settings.channelStyle=conf.getInt("channelStyle",1);
     settings.channelVolStyle=conf.getInt("channelVolStyle",0);
     settings.channelFeedbackStyle=conf.getInt("channelFeedbackStyle",1);
+    settings.channelFeedbackGamma=conf.getFloat("channelFeedbackGamma",1.0f);
     settings.channelFont=conf.getInt("channelFont",1);
     settings.channelTextCenter=conf.getInt("channelTextCenter",1);
 
@@ -5183,7 +5225,6 @@ void FurnaceGUI::readConfig(DivConfig& conf, FurnaceGUISettingGroups groups) {
   if (groups&GUI_SETTINGS_LAYOUTS) {
     settings.fmLayout=conf.getInt("fmLayout",4);
     settings.sampleLayout=conf.getInt("sampleLayout",0);
-    settings.waveLayout=conf.getInt("waveLayout",0);
     settings.exportOptionsLayout=conf.getInt("exportOptionsLayout",1);
     settings.unifiedDataView=conf.getInt("unifiedDataView",0);
     settings.macroLayout=conf.getInt("macroLayout",0);
@@ -5357,7 +5398,6 @@ void FurnaceGUI::readConfig(DivConfig& conf, FurnaceGUISettingGroups groups) {
   clampSetting(settings.frameBorders,0,1);
   clampSetting(settings.effectDeletionAltersValue,0,1);
   clampSetting(settings.sampleLayout,0,1);
-  clampSetting(settings.waveLayout,0,1);
   clampSetting(settings.separateFMColors,0,1);
   clampSetting(settings.insEditColorize,0,1);
   clampSetting(settings.metroVol,0,200);
@@ -5385,6 +5425,7 @@ void FurnaceGUI::readConfig(DivConfig& conf, FurnaceGUISettingGroups groups) {
   clampSetting(settings.effectValCellSpacing,0,32);
   clampSetting(settings.doubleClickColumn,0,1);
   clampSetting(settings.blankIns,0,1);
+  clampSetting(settings.warnNotePassthrough,0,1);
   clampSetting(settings.dragMovesSelection,0,5);
   clampSetting(settings.draggableDataView,0,1);
   clampSetting(settings.unsignedDetune,0,1);
@@ -5396,7 +5437,8 @@ void FurnaceGUI::readConfig(DivConfig& conf, FurnaceGUISettingGroups groups) {
   clampSetting(settings.channelTextColors,0,2);
   clampSetting(settings.channelStyle,0,5);
   clampSetting(settings.channelVolStyle,0,4);
-  clampSetting(settings.channelFeedbackStyle,0,3);
+  clampSetting(settings.channelFeedbackStyle,0,4);
+  clampSetting(settings.channelFeedbackGamma,0.0f,2.0f);
   clampSetting(settings.channelFont,0,1);
   clampSetting(settings.channelTextCenter,0,1);
   clampSetting(settings.maxRecentFile,0,30);
@@ -5531,6 +5573,7 @@ void FurnaceGUI::writeConfig(DivConfig& conf, FurnaceGUISettingGroups groups) {
     conf.set("displayAllInsTypes",settings.displayAllInsTypes);
 
     conf.set("blankIns",settings.blankIns);
+    conf.set("warnNotePassthrough",settings.warnNotePassthrough);
 
     conf.set("saveWindowPos",settings.saveWindowPos);
 
@@ -5708,6 +5751,7 @@ void FurnaceGUI::writeConfig(DivConfig& conf, FurnaceGUISettingGroups groups) {
     conf.set("channelStyle",settings.channelStyle);
     conf.set("channelVolStyle",settings.channelVolStyle);
     conf.set("channelFeedbackStyle",settings.channelFeedbackStyle);
+    conf.set("channelFeedbackGamma",settings.channelFeedbackGamma);
     conf.set("channelFont",settings.channelFont);
     conf.set("channelTextCenter",settings.channelTextCenter);
 
@@ -5771,7 +5815,6 @@ void FurnaceGUI::writeConfig(DivConfig& conf, FurnaceGUISettingGroups groups) {
   if (groups&GUI_SETTINGS_LAYOUTS) {
     conf.set("fmLayout",settings.fmLayout);
     conf.set("sampleLayout",settings.sampleLayout);
-    conf.set("waveLayout",settings.waveLayout);
     conf.set("exportOptionsLayout",settings.exportOptionsLayout);
     conf.set("unifiedDataView",settings.unifiedDataView);
     conf.set("macroLayout",settings.macroLayout);

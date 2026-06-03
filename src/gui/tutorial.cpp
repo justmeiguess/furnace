@@ -1,6 +1,6 @@
 /**
  * Furnace Tracker - multi-system chiptune tracker
- * Copyright (C) 2021-2025 tildearrow and contributors
+ * Copyright (C) 2021-2026 tildearrow and contributors
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -179,6 +179,9 @@ struct FurnaceCV {
   std::vector<FurnaceCVObject*> sprite;
   // this offset is applied to sprites.
   int viewX, viewY;
+
+  // other
+  char hiScoreText[512];
 
   // input
   unsigned char joyInputPrev;
@@ -666,7 +669,11 @@ static const char* cvText[]={
 
   _N("GAME OVER"),
 
-  _N("High Score!"),
+  _N("           CONGREGURATION\n\n\n"
+  "YOU ARE GOOD PLAY AT GAME\n"
+  "PRESS ESCAPE TO RESET GAME\n\n"
+  "AND PLAY AGAIN AT ELEVATED DIFFICULTY\n\n\n"
+  "%d SCORES THIS GAME"),
 
   _N("Welcome to Combat Vehicle!\n\n"
   "Controls:\n"
@@ -685,6 +692,7 @@ void FurnaceGUI::syncTutorial() {
   tutorial.importedS3M=e->getConfBool("tutImportedS3M",false);
   tutorial.importedXM=e->getConfBool("tutImportedXM",false);
   tutorial.importedIT=e->getConfBool("tutImportedIT",false);
+  tutorial.nprFieldTrial=e->getConfBool("tutNPRFieldTrial",false);
 }
 
 void FurnaceGUI::commitTutorial() {
@@ -694,6 +702,7 @@ void FurnaceGUI::commitTutorial() {
   e->setConf("tutImportedS3M",tutorial.importedS3M);
   e->setConf("tutImportedXM",tutorial.importedXM);
   e->setConf("tutImportedIT",tutorial.importedIT);
+  e->setConf("tutNPRFieldTrial",tutorial.nprFieldTrial);
 }
 
 void FurnaceGUI::initRandomDemoSong() {
@@ -1328,7 +1337,7 @@ template<typename T> T* FurnaceCV::createObjectNoPos() {
 }
 
 void FurnaceCV::soundEffect(int ins, int chan, int note) {
-  e->noteOn(chan+fxChanBase,ins+fxInsBase,note);
+  e->noteOn(chan+fxChanBase,ins+fxInsBase,note+60);
   /*
   e->dispatchCmd(DivCommand(DIV_CMD_INSTRUMENT,chan,ins,1));
   e->dispatchCmd(DivCommand(DIV_CMD_NOTE_ON,chan,note));
@@ -1695,7 +1704,8 @@ void FurnaceCV::render(unsigned char joyIn) {
             }
             memset(tile0,0,80*56*sizeof(short));
             memset(tile1,0,80*56*sizeof(short));
-            startTyping(_(cvText[3]),2,3);
+            snprintf(hiScoreText,511,_(cvText[3]),hiScore);
+            startTyping(hiScoreText,2,3);
             e->setConf("cvHiScore",hiScore);
             e->saveConf();
             curText=4;

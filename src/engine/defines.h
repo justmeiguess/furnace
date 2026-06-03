@@ -1,6 +1,6 @@
 /**
  * Furnace Tracker - multi-system chiptune tracker
- * Copyright (C) 2021-2025 tildearrow and contributors
+ * Copyright (C) 2021-2026 tildearrow and contributors
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,8 +39,8 @@
 #define DIV_PAT_FXVAL(_x) (4+((_x)<<1))
 
 // column type checks
-#define DIV_PAT_IS_EFFECT(_x) ((_x)>DIV_PAT_VOL && (!((_x)&1)))
-#define DIV_PAT_IS_EFFECT_VAL(_x) ((_x)>DIV_PAT_VOL && ((_x)&1))
+#define DIV_PAT_IS_EFFECT(_x) ((_x)>DIV_PAT_VOL && ((_x)&1))
+#define DIV_PAT_IS_EFFECT_VAL(_x) ((_x)>DIV_PAT_VOL && (!((_x)&1)))
 
 #define DIV_NOTE_NULL_PAT 252
 #define DIV_NOTE_OFF 253

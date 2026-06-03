@@ -1,6 +1,6 @@
 /**
  * Furnace Tracker - multi-system chiptune tracker
- * Copyright (C) 2021-2025 tildearrow and contributors
+ * Copyright (C) 2021-2026 tildearrow and contributors
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -150,7 +150,7 @@ int DivPlatformYM2608Ext::dispatch(DivCommand c) {
       } else {
         opChan[ch].pan=(c.value2>0)|((c.value>0)<<1);
       }
-      if (parent->song.sharedExtStat) {
+      if (parent->song.compatFlags.sharedExtStat) {
         for (int i=0; i<4; i++) {
           if (ch==i) continue;
           opChan[i].pan=opChan[ch].pan;
@@ -166,8 +166,9 @@ int DivPlatformYM2608Ext::dispatch(DivCommand c) {
       break;
     }
     case DIV_CMD_NOTE_PORTA: {
-      if (parent->song.linearPitch) {
-        int destFreq=NOTE_FREQUENCY(c.value2);
+      if (parent->song.compatFlags.linearPitch) {
+        // TODO: use DivPitchTable.
+        int destFreq=(c.value2)<<7;
         bool return2=false;
         if (destFreq>opChan[ch].baseFreq) {
           opChan[ch].baseFreq+=c.value;
@@ -510,7 +511,7 @@ void DivPlatformYM2608Ext::tick(bool sysTick) {
     if (opChan[i].std.alg.had) {
       chan[extChanOffs].state.alg=opChan[i].std.alg.val;
       rWrite(chanOffs[extChanOffs]+ADDR_FB_ALG,(chan[extChanOffs].state.alg&7)|(chan[extChanOffs].state.fb<<3));
-      if (!parent->song.algMacroBehavior) for (int j=0; j<4; j++) {
+      if (!parent->song.compatFlags.algMacroBehavior) for (int j=0; j<4; j++) {
         unsigned short baseAddr=chanOffs[extChanOffs]|opOffs[j];
         DivInstrumentFM::Operator& op=chan[extChanOffs].state.op[j];
         if (isOpMuted[j] || !op.enable) {
@@ -541,7 +542,7 @@ void DivPlatformYM2608Ext::tick(bool sysTick) {
 
     if (opChan[i].std.panL.had) {
       opChan[i].pan=opChan[i].std.panL.val&3;
-      if (parent->song.sharedExtStat) {
+      if (parent->song.compatFlags.sharedExtStat) {
         for (int j=0; j<4; j++) {
           if (i==j) continue;
           opChan[j].pan=opChan[i].pan;
@@ -612,7 +613,7 @@ void DivPlatformYM2608Ext::tick(bool sysTick) {
   unsigned char hardResetMask=0;
   if (extMode) for (int i=0; i<4; i++) {
     if (opChan[i].freqChanged) {
-      if (parent->song.linearPitch) {
+      if (parent->song.compatFlags.linearPitch) {
         opChan[i].freq=parent->calcFreq(opChan[i].baseFreq,opChan[i].pitch,opChan[i].fixedArp?opChan[i].baseNoteOverride:opChan[i].arpOff,opChan[i].fixedArp,false,4,opChan[i].pitch2,chipClock,CHIP_FREQBASE,11,chan[extChanOffs].state.block);
       } else {
         int fNum=parent->calcFreq(opChan[i].baseFreq&0x7ff,opChan[i].pitch,opChan[i].fixedArp?opChan[i].baseNoteOverride:opChan[i].arpOff,opChan[i].fixedArp,false,4,opChan[i].pitch2);
@@ -647,7 +648,7 @@ void DivPlatformYM2608Ext::tick(bool sysTick) {
   }
   if (extMode) {
     if (chan[csmChan].freqChanged) {
-      chan[csmChan].freq=parent->calcFreq(chan[csmChan].baseFreq,chan[csmChan].pitch,chan[csmChan].fixedArp?chan[csmChan].baseNoteOverride:chan[csmChan].arpOff,chan[csmChan].fixedArp,true,0,chan[csmChan].pitch2,chipClock,CHIP_DIVIDER);
+      chan[csmChan].freq=chan[csmChan].calcFreq();
       if (chan[csmChan].freq<1) chan[csmChan].freq=1;
       if (chan[csmChan].freq>1024) chan[csmChan].freq=1024;
       int wf=0x400-chan[csmChan].freq;
@@ -801,7 +802,7 @@ void DivPlatformYM2608Ext::forceIns() {
   }
 }
 
-void* DivPlatformYM2608Ext::getChanState(int ch) {
+SharedChannel* DivPlatformYM2608Ext::getChanState(int ch) {
   if (ch>=6) return &chan[ch-3];
   if (ch>=2) return &opChan[ch-2];
   return &chan[ch];

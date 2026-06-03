@@ -1,6 +1,6 @@
 /**
  * Furnace Tracker - multi-system chiptune tracker
- * Copyright (C) 2021-2025 tildearrow and contributors
+ * Copyright (C) 2021-2026 tildearrow and contributors
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -277,7 +277,7 @@ TAParamResult pLogLevel(String val) {
 
 TAParamResult pVersion(String) {
   printf("Furnace version " DIV_VERSION ".\n\n");
-  printf("copyright (C) 2021-2025 tildearrow and contributors.\n");
+  printf("copyright (C) 2021-2026 tildearrow and contributors.\n");
 #ifdef FURNACE_GPL3
   printf("licensed under the GNU General Public License version 3\n");
   printf("<https://www.gnu.org/licenses/gpl-3.0.en.html>.\n\n");
@@ -539,8 +539,10 @@ TAParamResult pBenchmark(String val) {
     benchMode=1;
   } else if (val=="seek") {
     benchMode=2;
+  } else if (val=="walk") {
+    benchMode=3;
   } else {
-    logE("invalid value for benchmark! valid values are: render and seek.");
+    logE("invalid value for benchmark! valid values are: render, seek and walk.");
     return TA_PARAM_ERROR;
   }
   e.setAudio(DIV_AUDIO_DUMMY);
@@ -653,7 +655,7 @@ void initParams() {
   params.push_back(TAParam("S","safemode",false,pSafeMode,"","enable safe mode (software rendering and no audio)"));
   params.push_back(TAParam("A","safeaudio",false,pSafeModeAudio,"","enable safe mode (with audio"));
 
-  params.push_back(TAParam("B","benchmark",true,pBenchmark,"render|seek","run performance test"));
+  params.push_back(TAParam("B","benchmark",true,pBenchmark,"render|seek|walk","run performance test"));
 
   params.push_back(TAParam("V","version",false,pVersion,"","view information about Furnace."));
   params.push_back(TAParam("W","warranty",false,pWarranty,"","view warranty disclaimer."));
@@ -1031,7 +1033,9 @@ int main(int argc, char** argv) {
 
   if (benchMode) {
     logI("starting benchmark!");
-    if (benchMode==2) {
+    if (benchMode==3) {
+      e.benchmarkWalk();
+    } else if (benchMode==2) {
       e.benchmarkSeek();
     } else {
       e.benchmarkPlayback();

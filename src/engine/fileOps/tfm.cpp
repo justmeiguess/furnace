@@ -1,6 +1,6 @@
 /**
  * Furnace Tracker - multi-system chiptune tracker
- * Copyright (C) 2021-2025 tildearrow and contributors
+ * Copyright (C) 2021-2026 tildearrow and contributors
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -551,7 +551,7 @@ bool DivEngine::loadTFMv1(unsigned char* file, size_t len) {
     ds.systemLen=1;
 
     ds.system[0]=DIV_SYSTEM_YM2612;
-    ds.loopModality=1;
+    ds.compatFlags.loopModality=1;
 
     unsigned char speed=reader.readCNoRLE();
     unsigned char interleaveFactor=reader.readCNoRLE();
@@ -704,13 +704,15 @@ bool DivEngine::loadTFMv1(unsigned char* file, size_t len) {
     info.loopPos=loopPos;
     TFMParsePattern(info);
 
+    ds.recalcChans();
+
     if (active) quitDispatch();
     BUSY_BEGIN_SOFT;
     saveLock.lock();
     song.unload();
     song=ds;
+    hasLoadedSomething=true;
     changeSong(0);
-    recalcChans();
     saveLock.unlock();
     BUSY_END;
     if (active) {
@@ -744,7 +746,7 @@ bool DivEngine::loadTFMv2(unsigned char* file, size_t len) {
     ds.systemLen=1;
 
     ds.system[0]=DIV_SYSTEM_YM2612;
-    ds.loopModality=1;
+    ds.compatFlags.loopModality=1;
 
     unsigned char magic[8]={0};
 
@@ -904,13 +906,16 @@ bool DivEngine::loadTFMv2(unsigned char* file, size_t len) {
     info.loopPos=loopPos;
     TFMParsePattern(info);
 
+    ds.initDefaultSystemChans();
+    ds.recalcChans();
+
     if (active) quitDispatch();
     BUSY_BEGIN_SOFT;
     saveLock.lock();
     song.unload();
     song=ds;
+    hasLoadedSomething=true;
     changeSong(0);
-    recalcChans();
     saveLock.unlock();
     BUSY_END;
     if (active) {
