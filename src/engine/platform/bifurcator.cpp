@@ -55,12 +55,24 @@ void DivPlatformBifurcator::acquire(short** buf, size_t len) {
     int l=0;
     int r=0;
     for (int i=0; i<4; i++) {
-      chan[i].audSub+=chan[i].freq;
-      if (chan[i].audSub>=65536) {
-        int64_t newx=(int64_t)chan[i].curx+(chan[i].param);
-        chan[i].curx=(int)(newx&65535);
-        chan[i].audSub&=65535;
-      }
+      chan[i].audSub+=chan[i].freq/4;
+      int64_t newx=(int64_t)chan[i].curx*(chan[i].param+65536)/32768;
+      newx*=65536-chan[i].curx;
+      chan[i].audSub&=65535;
+	    int phase = chan[i].audSub >> 8;
+	    int lowPass = chan[i].param & 15;
+	    int lowPassFine = 1 - (lowPass & 1);
+	    int duty = (chan[i].param >> 4) & 7;
+	    int square = (chan[i].param >> 7) & 7;
+	    int triangle = (chan[i].param >> 10) & 7;
+	    int saw = (chan[i].param >> 13) & 7;
+	    newx = ((((((phase > ((duty << 4) + 16))) ? 255 : 0) >> square) ^ ((phase << 1) >> triangle)) + ((((((((phase << 2) & 255) > 128 ? 255 : 0) ^ ((phase << 2) & 255)) >> duty) + phase) & 255) >> saw)) & 255;
+	    int filterBase = 
+		    (lowPass < 13)?
+			  ((((newx << 8) - chan[i].curx) >> (lowPass >> 1)) + (((newx << 8) - chan[i].curx) >> ((lowPass >> 1) + 1)) * lowPassFine) >> 2:
+			  (((newx << 8) - chan[i].curx) >> lowPass);
+
+      chan[i].curx=(int)((((chan[i].curx + filterBase) + ((chan[i].curx - 32768) >> (25-lowPass)) + (64 >> lowPass)) & 65535) ^ ((chan[i].curx >> (28-lowPass))) << ((lowPass-13) << 1));
       int out=chan[i].curx-32768;
       int outL=out*chan[i].chVolL/256;
       int outR=out*chan[i].chVolR/256;
