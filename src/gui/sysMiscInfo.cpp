@@ -457,6 +457,7 @@ void FurnaceGUI::drawSystemChannelInfoText(const DivSysDef* whichDef) {
       case DIV_INS_SID2:
         chanCount[CHANNEL_TYPE_OTHER]++;
         break;
+	  case DIV_INS_BITTANGO:
       default:
         chanCount[chanDef.type]++;
         break;

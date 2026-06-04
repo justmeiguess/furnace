@@ -2750,6 +2750,19 @@ void DivEngine::registerSystems() {
     _("this is a system designed for testing purposes."),
     DivChanDefFunc(stockChanDef<DIV_CH_NOISE,DIV_INS_STD>)
   );
+  
+  sysDefs[DIV_SYSTEM_BITTANGO]=new DivSysDef(
+    _("BitTango"), NULL, 0xd9, 0, 4, 4, 4,
+    false, true, 0, false, 0, 0, 0,
+    _("a fantasy sound chip using bitwise operations to generate sound."),
+    DivChanDefFunc(simpleChanDef<DIV_CH_NOISE,DIV_INS_BITTANGO>),
+    {
+      {0x10, {DIV_CMD_BITTANGO_STATE_LOAD, _("10xx: Load low byte of channel sample state"), constVal<0>, effectVal}},
+      {0x11, {DIV_CMD_BITTANGO_STATE_LOAD, _("11xx: Load high byte of channel sample state"), constVal<1>, effectVal}},
+      {0x12, {DIV_CMD_BITTANGO_PARAMETER, _("12xx: Set low byte of channel parameter"), constVal<0>, effectVal}},
+      {0x13, {DIV_CMD_BITTANGO_PARAMETER, _("13xx: Set high byte of channel parameter"), constVal<1>, effectVal}},
+    }
+  );
 
   for (int i=0; i<DIV_MAX_CHIP_DEFS; i++) {
     if (sysDefs[i]==NULL) continue;

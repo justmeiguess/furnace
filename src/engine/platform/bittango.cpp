@@ -18,7 +18,7 @@
  */
 
 #define _USE_MATH_DEFINES
-#include "bifurcator.h"
+#include "bittango.h"
 #include "../engine.h"
 #include "../filter.h"
 #include <math.h>
@@ -27,7 +27,7 @@
 
 #define rWrite(a,v) {if(!skipRegisterWrites) {regPool[a]=v; if(dumpWrites) addWrite(a,v); }}
 
-const char* regCheatSheetBifurcator[]={
+const char* regCheatSheetBittango[]={
   "CHx_State", "x*8+0",
   "CHx_Param", "x*8+2",
   "CHx_Freq", "x*8+4",
@@ -36,11 +36,11 @@ const char* regCheatSheetBifurcator[]={
   NULL
 };
 
-const char** DivPlatformBifurcator::getRegisterSheet() {
-  return regCheatSheetBifurcator;
+const char** DivPlatformBittango::getRegisterSheet() {
+  return regCheatSheetBittango;
 }
 
-void DivPlatformBifurcator::acquire(short** buf, size_t len) {
+void DivPlatformBittango::acquire(short** buf, size_t len) {
   for (int i=0; i<4; i++) {
     chan[i].curx=regPool[i*8]|(regPool[i*8+1]<<8);
     chan[i].param=regPool[i*8+2]|(regPool[i*8+3]<<8);
@@ -55,13 +55,24 @@ void DivPlatformBifurcator::acquire(short** buf, size_t len) {
     int l=0;
     int r=0;
     for (int i=0; i<4; i++) {
-      chan[i].audSub+=chan[i].freq;
-      if (chan[i].audSub>=65536) {
-        int64_t newx=(int64_t)chan[i].curx*(chan[i].param+65536)/32768;
-        newx*=65536-chan[i].curx;
-        chan[i].curx=(int)(newx/65536);
-        chan[i].audSub&=65535;
-      }
+      chan[i].audSub+=chan[i].freq/4;
+      int64_t newx=(int64_t)chan[i].curx*(chan[i].param+65536)/32768;
+      newx*=65536-chan[i].curx;
+      chan[i].audSub&=65535;
+	    int phase = chan[i].audSub >> 8;
+	    int lowPass = chan[i].param & 15;
+	    int lowPassFine = 1 - (lowPass & 1);
+	    int duty = (chan[i].param >> 4) & 7;
+	    int square = (chan[i].param >> 7) & 7;
+	    int triangle = (chan[i].param >> 10) & 7;
+	    int saw = (chan[i].param >> 13) & 7;
+	    newx = ((((((phase > ((duty << 4) + 16))) ? 255 : 0) >> square) ^ ((phase << 1) >> triangle)) + ((((((((phase << 2) & 255) > 128 ? 255 : 0) ^ ((phase << 2) & 255)) >> duty) + phase) & 255) >> saw)) & 255;
+	    int filterBase = 
+		    (lowPass < 13)?
+			  ((((newx << 8) - chan[i].curx) >> (lowPass >> 1)) + (((newx << 8) - chan[i].curx) >> ((lowPass >> 1) + 1)) * lowPassFine) >> 2:
+			  (((newx << 8) - chan[i].curx) >> lowPass);
+
+      chan[i].curx=(int)((((chan[i].curx + filterBase) + ((chan[i].curx - 32768) >> (25-lowPass)) + (64 >> lowPass)) & 65535) ^ ((chan[i].curx >> (28-lowPass))) << ((lowPass-13) << 1));
       int out=chan[i].curx-32768;
       int outL=out*chan[i].chVolL/256;
       int outR=out*chan[i].chVolR/256;
@@ -81,7 +92,7 @@ void DivPlatformBifurcator::acquire(short** buf, size_t len) {
   }
 }
 
-void DivPlatformBifurcator::tick(bool sysTick) {
+void DivPlatformBittango::tick(bool sysTick) {
   for (int i=0; i<4; i++) {
     chan[i].std.next();
     if (chan[i].std.vol.had) {
@@ -164,7 +175,7 @@ void DivPlatformBifurcator::tick(bool sysTick) {
   }
 }
 
-int DivPlatformBifurcator::dispatch(DivCommand c) {
+int DivPlatformBittango::dispatch(DivCommand c) {
   switch (c.cmd) {
     case DIV_CMD_NOTE_ON: {
       DivInstrument* ins=parent->getIns(chan[c.chan].ins,DIV_INS_BIFURCATOR);
@@ -255,10 +266,10 @@ int DivPlatformBifurcator::dispatch(DivCommand c) {
       if (!chan[c.chan].inPorta && c.value && !parent->song.compatFlags.brokenPortaArp && chan[c.chan].std.arp.will && !NEW_ARP_STRAT) chan[c.chan].baseFreq=chan[c.chan].calcBaseFreq(chan[c.chan].note);
       chan[c.chan].inPorta=c.value;
       break;
-    case DIV_CMD_BIFURCATOR_STATE_LOAD:
+    case DIV_CMD_BITTANGO_STATE_LOAD:
       rWrite(c.chan*8+c.value,c.value2);
       break;
-    case DIV_CMD_BIFURCATOR_PARAMETER:
+    case DIV_CMD_BITTANGO_PARAMETER:
       rWrite(c.chan*8+2+c.value,c.value2);
       break;
     case DIV_CMD_GET_VOLMAX:
@@ -279,13 +290,13 @@ int DivPlatformBifurcator::dispatch(DivCommand c) {
   return 1;
 }
 
-void DivPlatformBifurcator::muteChannel(int ch, bool mute) {
+void DivPlatformBittango::muteChannel(int ch, bool mute) {
   isMuted[ch]=mute;
   chan[ch].volChangedL=true;
   chan[ch].volChangedR=true;
 }
 
-void DivPlatformBifurcator::forceIns() {
+void DivPlatformBittango::forceIns() {
   for (int i=0; i<4; i++) {
     chan[i].insChanged=true;
     chan[i].volChangedL=true;
@@ -294,26 +305,26 @@ void DivPlatformBifurcator::forceIns() {
   }
 }
 
-SharedChannel* DivPlatformBifurcator::getChanState(int ch) {
+SharedChannel* DivPlatformBittango::getChanState(int ch) {
   return &chan[ch];
 }
 
-DivDispatchOscBuffer* DivPlatformBifurcator::getOscBuffer(int ch) {
+DivDispatchOscBuffer* DivPlatformBittango::getOscBuffer(int ch) {
   return oscBuf[ch];
 }
 
-unsigned char* DivPlatformBifurcator::getRegisterPool() {
+unsigned char* DivPlatformBittango::getRegisterPool() {
   return (unsigned char*)regPool;
 }
 
-int DivPlatformBifurcator::getRegisterPoolSize() {
+int DivPlatformBittango::getRegisterPoolSize() {
   return 8*4;
 }
 
-void DivPlatformBifurcator::reset() {
+void DivPlatformBittango::reset() {
   memset(regPool,0,8*4);
   for (int i=0; i<4; i++) {
-    chan[i]=DivPlatformBifurcator::Channel(parent->song.compatFlags.linearPitch);
+    chan[i]=DivPlatformBittango::Channel(parent->song.compatFlags.linearPitch);
     chan[i].pitchTable=&pitchTable;
     chan[i].std.setEngine(parent);
     rWrite(i*8,chan[i].curx&0xff);
@@ -323,23 +334,23 @@ void DivPlatformBifurcator::reset() {
   }
 }
 
-int DivPlatformBifurcator::getOutputCount() {
+int DivPlatformBittango::getOutputCount() {
   return 2;
 }
 
-bool DivPlatformBifurcator::hasSoftPan(int ch) {
+bool DivPlatformBittango::hasSoftPan(int ch) {
   return true;
 }
 
-DivMacroInt* DivPlatformBifurcator::getChanMacroInt(int ch) {
+DivMacroInt* DivPlatformBittango::getChanMacroInt(int ch) {
   return &chan[ch].std;
 }
 
-unsigned short DivPlatformBifurcator::getPan(int ch) {
+unsigned short DivPlatformBittango::getPan(int ch) {
   return (chan[ch].chPanL<<8)|(chan[ch].chPanR);
 }
 
-void DivPlatformBifurcator::notifyInsChange(int ins) {
+void DivPlatformBittango::notifyInsChange(int ins) {
   for (int i=0; i<4; i++) {
     if (chan[i].ins==ins) {
       chan[i].insChanged=true;
@@ -347,17 +358,17 @@ void DivPlatformBifurcator::notifyInsChange(int ins) {
   }
 }
 
-void DivPlatformBifurcator::notifyInsDeletion(void* ins) {
+void DivPlatformBittango::notifyInsDeletion(void* ins) {
   for (int i=0; i<4; i++) {
     chan[i].std.notifyInsDeletion((DivInstrument*)ins);
   }
 }
 
-void DivPlatformBifurcator::notifyPitchTable(int sample) {
+void DivPlatformBittango::notifyPitchTable(int sample) {
   pitchTable.init(parent->song.tuning,chipClock,CHIP_FREQBASE,0xffff,false,parent->song.compatFlags.linearPitch);
 }
 
-void DivPlatformBifurcator::setFlags(const DivConfig& flags) {
+void DivPlatformBittango::setFlags(const DivConfig& flags) {
   chipClock=1000000;
   CHECK_CUSTOM_CLOCK;
   rate=chipClock/16;
@@ -368,15 +379,15 @@ void DivPlatformBifurcator::setFlags(const DivConfig& flags) {
   notifyPitchTable();
 }
 
-void DivPlatformBifurcator::poke(unsigned int addr, unsigned short val) {
+void DivPlatformBittango::poke(unsigned int addr, unsigned short val) {
   rWrite(addr,val);
 }
 
-void DivPlatformBifurcator::poke(std::vector<DivRegWrite>& wlist) {
+void DivPlatformBittango::poke(std::vector<DivRegWrite>& wlist) {
   for (DivRegWrite& i: wlist) rWrite(i.addr,i.val);
 }
 
-int DivPlatformBifurcator::init(DivEngine* p, int channels, int sugRate, const DivConfig& flags) {
+int DivPlatformBittango::init(DivEngine* p, int channels, int sugRate, const DivConfig& flags) {
   parent=p;
   dumpWrites=false;
   skipRegisterWrites=false;
@@ -389,7 +400,7 @@ int DivPlatformBifurcator::init(DivEngine* p, int channels, int sugRate, const D
   return 4;
 }
 
-void DivPlatformBifurcator::quit() {
+void DivPlatformBittango::quit() {
   for (int i=0; i<4; i++) {
     delete oscBuf[i];
   }

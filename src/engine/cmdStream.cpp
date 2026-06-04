@@ -534,6 +534,8 @@ bool DivCSPlayer::tick() {
             arg0=(unsigned char)stream.readC();
             arg1=(unsigned char)stream.readC();
             break;
+		  case DIV_CMD_BITTANGO_STATE_LOAD:
+          case DIV_CMD_BITTANGO_PARAMETER:
           // ONE SHORT COMMANDS
           case DIV_CMD_C64_FINE_DUTY:
           case DIV_CMD_C64_FINE_CUTOFF:

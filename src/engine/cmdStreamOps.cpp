@@ -229,6 +229,8 @@ int DivCS::getCmdLength(unsigned char ext) {
       return 2;
     case DIV_CMD_SAMPLE_POS:
       return 4;
+	case DIV_CMD_BITTANGO_STATE_LOAD:
+    case DIV_CMD_BITTANGO_PARAMETER:
     default:
       return 0;
   }
@@ -605,6 +607,8 @@ void writeCommandValues(SafeWriter* w, const DivCommand& c, bool bigEndian) {
       w->writeC(c.value);
       w->writeC(c.value2);
       break;
+	case DIV_CMD_BITTANGO_STATE_LOAD:
+    case DIV_CMD_BITTANGO_PARAMETER:
     case DIV_CMD_C64_FINE_DUTY:
     case DIV_CMD_C64_FINE_CUTOFF:
     case DIV_CMD_LYNX_LFSR_LOAD:
